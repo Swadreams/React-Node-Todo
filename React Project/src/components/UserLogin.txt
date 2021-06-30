@@ -1,0 +1,128 @@
+import React from 'react';
+import { signIn, signOut } from '../redux/auth/authSlice';
+import { signInAsync } from '../redux/auth/authAsync';
+import { clearAuthError } from '../redux/errorSlice';
+import { connect } from 'react-redux';
+import './Login.css';
+import Footer from './Footer';
+
+interface IEmail {
+  email: string;
+}
+
+interface IProps {
+  signInAsync: (arg: IEmail) => void;
+  signIn: (arg: IEmail) => void;
+  signOut: () => void;
+  clearErrors: () => void;
+  isSignedIn: boolean;
+  history: any;
+  loginError: any;
+}
+
+class UserLogin extends React.Component<IProps> {
+  auth: any;
+  user: any;
+
+  componentDidMount() {
+    const gapi = (window as { [key: string]: any })['gapi'];
+    gapi?.load('client:auth2', () => {
+      gapi.client
+        .init({
+          clientId:
+            '883421589209-2piaf5avpgbdj1ovv5a90up4m4i35ai7.apps.googleusercontent.com',
+          scope: 'email',
+        })
+        .then(() => {
+          this.auth = gapi.auth2.getAuthInstance();
+          this.user = this.auth.currentUser.get();
+          this.onAuthChange(this.auth.isSignedIn.get());
+          this.auth.isSignedIn.listen(this.onAuthChange);
+        });
+    });
+  }
+
+  componentWillUpdate(nextProps: any, nextState: any) {
+    console.log('this.props.isSignedIn :', nextProps, nextState);
+    if (nextProps.isSignedIn) {
+      const email = this.user.getBasicProfile().getEmail();
+      this.props.signIn({ email });
+      this.props.history.push('/todos');
+    }
+
+    if (this.props.loginError) {
+      this.auth.signOut();
+    }
+  }
+
+  onAuthChange = (isSignedIn: boolean) => {
+    if (isSignedIn) {
+      const email = this.user.getBasicProfile().getEmail();
+      this.props.signInAsync({ email });
+      // this.props.signIn({
+      //   id: user.getId(),
+      // } as unknown as number);
+      // this.props.history.push('/todos');
+    } else {
+      this.props.signOut();
+    }
+  };
+
+  signInClick = () => {
+    if (this.props.loginError) {
+      this.props.clearErrors();
+    }
+    this.auth.signIn();
+  };
+
+  signOut = () => {
+    this.props.clearErrors();
+    this.auth.signOut();
+  };
+
+  render() {
+    return (
+      <>
+        <div className='container-login'>
+          <div className='row'>
+            <div className='col'>
+              {this.props.isSignedIn && <h2>Logged in successfully.</h2>}
+              {this.props.loginError && (
+                <div className='alert alert-danger'>
+                  {this.props.loginError}
+                </div>
+              )}
+              <h4 className='text-center'> Welcome to Todo App</h4>
+              <p>
+                Created By Using React, Redux, Redux Toolkit, Node with Express,
+                Vercel
+              </p>
+              <button
+                onClick={this.signInClick}
+                className='google btn btn-login'
+              >
+                <i className='fa fa-google fa-fw'></i> Login with Google+
+              </button>
+            </div>
+          </div>
+        </div>
+        <Footer />
+      </>
+    );
+  }
+}
+
+const mapStateToProps = (state: any) => {
+  console.log(state);
+  return {
+    isSignedIn: state.auth.isSignedIn,
+    loginError: state.errors?.loginError?.errorMessage,
+  };
+};
+
+export default connect(mapStateToProps, {
+  signIn,
+  signOut,
+  signInAsync,
+  clearAuthError,
+})(UserLogin);
